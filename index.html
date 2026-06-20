@@ -1,1 +1,105 @@
-<p> Aqui estara el transmedia </p>
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infografía Viva</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Panzoom -->
+    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom/dist/panzoom.min.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Floating Header -->
+        <header class="glass-panel header">
+            <div class="logo-container">
+                <i data-lucide="sparkles" class="icon-accent"></i>
+                <h1>Explorador Interactivo</h1>
+            </div>
+            <p class="subtitle">Navega libremente por la infografía</p>
+            <div class="header-buttons mt-3">
+                <button id="open-videos" class="btn-text">
+                    <i data-lucide="play-circle"></i> Ver Videos del Proyecto
+                </button>
+                <button id="open-pdf" class="btn-text">
+                    <i data-lucide="file-text"></i> Presentacion
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Infographic Container -->
+        <main class="viewport">
+            <div id="panzoom-container">
+                <img src="Infografia.png" alt="Infografía Completa" id="infographic" />
+            </div>
+        </main>
+
+        <!-- Controls -->
+        <div class="glass-panel controls">
+            <button id="zoom-in" class="btn" title="Acercar">
+                <i data-lucide="zoom-in"></i>
+            </button>
+            <button id="reset" class="btn" title="Restablecer">
+                <i data-lucide="maximize"></i>
+            </button>
+            <button id="zoom-out" class="btn" title="Alejar">
+                <i data-lucide="zoom-out"></i>
+            </button>
+        </div>
+
+        <!-- Animated overlay hints -->
+        <div class="hint-overlay" id="hint">
+            <div class="mouse-icon">
+                <div class="wheel"></div>
+            </div>
+            <span>Desplaza y usa la rueda para explorar</span>
+        </div>
+        <!-- Video Modal -->
+        <div id="video-modal" class="modal hidden">
+            <div class="modal-content glass-panel">
+                <button id="close-videos" class="btn-close">
+                    <i data-lucide="x"></i>
+                </button>
+                <h2>Acerca del Proyecto</h2>
+                <div class="video-grid">
+                    <!-- Video 1 -->
+                    <div class="video-wrapper">
+                        <video controls>
+                            <source src="video_01.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <!-- Video 2 -->
+                    <div class="video-wrapper">
+                        <video controls>
+                            <source src="video_02.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PDF Modal -->
+        <div id="pdf-modal" class="modal hidden">
+            <div class="modal-content glass-panel pdf-modal-content">
+                <button id="close-pdf" class="btn-close">
+                    <i data-lucide="x"></i>
+                </button>
+                <h2>Presentación (Pitch)</h2>
+                <div class="pdf-wrapper">
+                    <!-- Asegúrate de que el archivo PDF se llame "pitch.pdf" o cambia esta ruta -->
+                    <iframe src="Pitch.pdf" title="Presentación Pitch"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
