@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Mapa de Conocimiento Interactivo</title>
+  
+  <!-- Outfit Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    /* Diseño de pantalla completa con estética oscura estilo Obsidian */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: transparent;
+      color: #e2e8f0;
+      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    #header {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 10;
+        background: rgba(15, 23, 42, 0.75);
+        padding: 16px 24px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        max-width: calc(100% - 40px);
+        width: 400px;
+        box-sizing: border-box;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      background: linear-gradient(135deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p {
+      margin: 4px 0 0 0;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    #network-container {
+        width: 100%;
+        height: 100vh;
+        display: block;
+    }
+
+    .filters {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .filter-label {
+        font-size: 0.8rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #94a3b8;
+        transition: color 0.2s ease;
+        user-select: none;
+    }
+
+    .filter-label:hover {
+        color: #ffffff;
+    }
+
+    .filter-label input {
+        cursor: pointer;
+        accent-color: #3b82f6;
+    }
+
+    /* Hint Overlay (Visual guidance for scrolling) */
+    .hint-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        pointer-events: none;
+        opacity: 1;
+        transition: opacity 0.5s ease;
+        z-index: 30;
+        background: rgba(0, 0, 0, 0.75);
+        padding: 24px 32px;
+        border-radius: 100px;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        color: #ffffff;
+        font-size: 0.95rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .hint-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Mouse Wheel Animation */
+    .mouse-icon {
+        width: 24px;
+        height: 36px;
+        border: 2px solid #ffffff;
+        border-radius: 12px;
+        position: relative;
+    }
+
+    .wheel {
+        width: 4px;
+        height: 8px;
+        background: #ffffff;
+        border-radius: 2px;
+        position: absolute;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        animation: scroll 1.5s infinite;
+    }
+
+    @keyframes scroll {
+        0% { top: 18px; opacity: 1; }
+        100% { top: 6px; opacity: 0; }
+    }
+
+    @media (max-width: 600px) {
+        #header {
+            top: 15px;
+            right: 15px;
+            left: 15px;
+            width: auto;
+            max-width: none;
+        }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h1>Repositorio de Investigación</h1>
+    <p>Mapa interactivo de archivos</p>
+    <hr style="border: 0; height: 1px; background: rgba(255, 255, 255, 0.08); margin: 12px 0;">
+    <div class="filters">
+        <label class="filter-label">
+            <input type="checkbox" id="chk-carpetas" checked onchange="filtrarMapa()"> 📂 Principales
+        </label>
+        <label class="filter-label">
+            <input type="checkbox" id="chk-subcarpetas" checked onchange="filtrarMapa()"> 📁 Subcarpetas
+        </label>
+        <label class="filter-label">
+            <input type="checkbox" id="chk-archivos" checked onchange="filtrarMapa()"> 📄 Archivos
+        </label>
+    </div>
+  </div>
+
+  <!-- Animated overlay hints -->
+  <div class="hint-overlay" id="hint">
+      <div class="mouse-icon">
+          <div class="wheel"></div>
+      </div>
+      <span>Usa la rueda para explorar el mapa</span>
+  </div>
+
+  <div id="network-container"></div>
+
+  <script type="text/javascript">
+    
+    // ========================================================
+    // DATOS INYECTADOS DIRECTAMENTE DESDE TU ARCHIVO JSON
+    // ========================================================
+    const datosRaw = [
+ {
+   "ID Nodo": "1WEPrYrYbxSuh5RqG6AMt9VkVf9ZBrrMb",
+   "Etiqueta (Nombre)": "2_Seminario_Investigación",
+   "Tipo": { "Nivel": "Carpeta Principal" },
+   "Conecta Con (Padre)": "nucleo",
+   "URL Drive": "https://drive.google.com/drive/folders/1WEPrYrYbxSuh5RqG6AMt9VkVf9ZBrrMb"
+},
+ {
+   "ID Nodo": "1DYNUkrpQATz9lbkcddUCocGJ2AkoWFd3",
+   "Etiqueta (Nombre)": "2025_1",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1WEPrYrYbxSuh5RqG6AMt9VkVf9ZBrrMb",
+   "URL Drive": "https://drive.google.com/drive/folders/1DYNUkrpQATz9lbkcddUCocGJ2AkoWFd3"
+},
+ {
+   "ID Nodo": "1NETdSqpYx5WnXFhZPKM2OmVomBVZX06Q",
+   "Etiqueta (Nombre)": "HOPERWARD.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1DYNUkrpQATz9lbkcddUCocGJ2AkoWFd3",
+   "URL Drive": "https://drive.google.com/file/d/1NETdSqpYx5WnXFhZPKM2OmVomBVZX06Q/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1WXE0dEMjVclBugZamL4M9dM7VxTPBbIQ",
+   "Etiqueta (Nombre)": "POWER SHIFT.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1DYNUkrpQATz9lbkcddUCocGJ2AkoWFd3",
+   "URL Drive": "https://drive.google.com/file/d/1WXE0dEMjVclBugZamL4M9dM7VxTPBbIQ/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1D3uwn260KYEU1na0cheJEam7HknuE5Er",
+   "Etiqueta (Nombre)": "CULTURAL SENTIMENTS.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1DYNUkrpQATz9lbkcddUCocGJ2AkoWFd3",
+   "URL Drive": "https://drive.google.com/file/d/1D3uwn260KYEU1na0cheJEam7HknuE5Er/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1NseD4fMbRLHZMvgAQyiJ-Rar96uYqO3F",
+   "Etiqueta (Nombre)": "2025_2",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1WEPrYrYbxSuh5RqG6AMt9VkVf9ZBrrMb",
+   "URL Drive": "https://drive.google.com/drive/folders/1NseD4fMbRLHZMvgAQyiJ-Rar96uYqO3F"
+},
+ {
+   "ID Nodo": "1_QvHy5n8vf7mU0WtEdDV6MwdhzQCEqf9",
+   "Etiqueta (Nombre)": "Revisión_0.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1NseD4fMbRLHZMvgAQyiJ-Rar96uYqO3F",
+   "URL Drive": "https://drive.google.com/file/d/1_QvHy5n8vf7mU0WtEdDV6MwdhzQCEqf9/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "160RFqvbbkVAmom-vhX12qUCZuhgdUsmX",
+   "Etiqueta (Nombre)": "V3-¡Nueva Denim!_Rodríguez_Samuel.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1NseD4fMbRLHZMvgAQyiJ-Rar96uYqO3F",
+   "URL Drive": "https://drive.google.com/file/d/160RFqvbbkVAmom-vhX12qUCZuhgdUsmX/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1WyBPCmEbV1ci8nPkTgta5IGJvdIDhzIv",
+   "Etiqueta (Nombre)": "Cuaderno_SI_25_2.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1NseD4fMbRLHZMvgAQyiJ-Rar96uYqO3F",
+   "URL Drive": "https://drive.google.com/file/d/1WyBPCmEbV1ci8nPkTgta5IGJvdIDhzIv/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1L46m7Sud4EKh9WEk_X860NzZPwPQcgAg",
+   "Etiqueta (Nombre)": "Captura de pantalla 2025-08-14 123111.png",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1NseD4fMbRLHZMvgAQyiJ-Rar96uYqO3F",
+   "URL Drive": "https://drive.google.com/file/d/1L46m7Sud4EKh9WEk_X860NzZPwPQcgAg/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1DmMTQBem-H-6DJv749Vr4U2QfJmC06-z",
+   "Etiqueta (Nombre)": "2026_1",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1WEPrYrYbxSuh5RqG6AMt9VkVf9ZBrrMb",
+   "URL Drive": "https://drive.google.com/drive/folders/1DmMTQBem-H-6DJv749Vr4U2QfJmC06-z"
+},
+ {
+   "ID Nodo": "1Ikyh_EY5aEekA90h6K6xuBBt2fkq9y4QZimbtZCB-pY",
+   "Etiqueta (Nombre)": "Planteamiento_Proyecto_Investigación_Samuel_Felipe_Rodríguez_Velásquez",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1DmMTQBem-H-6DJv749Vr4U2QfJmC06-z",
+   "URL Drive": "https://docs.google.com/spreadsheets/d/1Ikyh_EY5aEekA90h6K6xuBBt2fkq9y4QZimbtZCB-pY/edit?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1V68Vk97v9NTVMrXsxvaGSpzJMSqudOwe",
+   "Etiqueta (Nombre)": "Problem_Framing_Samuel_Felipe_Rodríguez_Velásquez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1DmMTQBem-H-6DJv749Vr4U2QfJmC06-z",
+   "URL Drive": "https://drive.google.com/file/d/1V68Vk97v9NTVMrXsxvaGSpzJMSqudOwe/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1T5ajX8LE3pfu0kUN6N_kQzdtvSHL0kt0",
+   "Etiqueta (Nombre)": "Matriz_Proyecto_Herramienta_Interactiva_Digital.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1DmMTQBem-H-6DJv749Vr4U2QfJmC06-z",
+   "URL Drive": "https://drive.google.com/file/d/1T5ajX8LE3pfu0kUN6N_kQzdtvSHL0kt0/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "104r6-Gj0cixcJldLRpYnbzMWjC1T4SzK",
+   "Etiqueta (Nombre)": "Mapa_Mental.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "104r6-Gj0cixcJldLRpYnbzMWjC1T4SzK",
+   "URL Drive": "https://drive.google.com/file/d/104r6-Gj0cixcJldLRpYnbzMWjC1T4SzK/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1oVJ8b5fphYLYrVpkcqq0HxNeIw2JjzQa",
+   "Etiqueta (Nombre)": "Pitch_Felipe_Velásquez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1DmMTQBem-H-6DJv749Vr4U2QfJmC06-z",
+   "URL Drive": "https://drive.google.com/file/d/1oVJ8b5fphYLYrVpkcqq0HxNeIw2JjzQa/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1nTUz54BBB5pqQvoYORL7-esFIyyo8C50",
+   "Etiqueta (Nombre)": "3_Recursos_Académicos ",
+   "Tipo": { "Nivel": "Carpeta Principal" },
+   "Conecta Con (Padre)": "nucleo",
+   "URL Drive": "https://drive.google.com/drive/folders/1nTUz54BBB5pqQvoYORL7-esFIyyo8C50"
+},
+ {
+   "ID Nodo": "1udlth9Y4p57kHI0cbPceqpMYH0bs8UUr",
+   "Etiqueta (Nombre)": "DocFinal_PG_Gracia_Castro_Cozé.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1nTUz54BBB5pqQvoYORL7-esFIyyo8C50",
+   "URL Drive": "https://drive.google.com/file/d/1udlth9Y4p57kHI0cbPceqpMYH0bs8UUr/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1IHmQ85jDMxIy3PfMQQQJqJFGq2RTZtDM",
+   "Etiqueta (Nombre)": "DocFinal_PG_Londoño_Roa_Ropavejero.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1nTUz54BBB5pqQvoYORL7-esFIyyo8C50",
+   "URL Drive": "https://drive.google.com/file/d/1IHmQ85jDMxIy3PfMQQQJqJFGq2RTZtDM/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "15yqC2o-J1zclcYk26NfUn0A6BEAfPkLI",
+   "Etiqueta (Nombre)": "1_Proyecto_Investigación",
+   "Tipo": { "Nivel": "Carpeta Principal" },
+   "Conecta Con (Padre)": "nucleo",
+   "URL Drive": "https://drive.google.com/drive/folders/15yqC2o-J1zclcYk26NfUn0A6BEAfPkLI"
+},
+ {
+   "ID Nodo": "1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV",
+   "Etiqueta (Nombre)": "2025_2",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "15yqC2o-J1zclcYk26NfUn0A6BEAfPkLI",
+   "URL Drive": "https://drive.google.com/drive/folders/1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV"
+},
+ {
+   "ID Nodo": "1qQFzdFiHYNFTpewrLp1CnW5g6T_E6yJY",
+   "Etiqueta (Nombre)": "¡Nueva Denim!_Upcycling.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV",
+   "URL Drive": "https://drive.google.com/file/d/1qQFzdFiHYNFTpewrLp1CnW5g6T_E6yJY/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1KCNtG7cIpWbmq2owW6ckOHmPj0xv3atX",
+   "Etiqueta (Nombre)": "Cuaderno_PI_25_2.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV",
+   "URL Drive": "https://drive.google.com/file/d/1KCNtG7cIpWbmq2owW6ckOHmPj0xv3atX/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1oGE2zfjeV20IRlTVaUYOEy7yyNlLhc3t",
+   "Etiqueta (Nombre)": "Taller_Cuatro_Samuel_Felipe_Rodríguez_Velásquez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV",
+   "URL Drive": "https://drive.google.com/file/d/1oGE2zfjeV20IRlTVaUYOEy7yyNlLhc3t/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "117Ot3lJpfMkIdgRLoqCMtXsePmZolJ5Z",
+   "Etiqueta (Nombre)": "Mapas_Mentales_Samuel_Felipe_Rodríguez_Velásquez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV",
+   "URL Drive": "https://drive.google.com/file/d/117Ot3lJpfMkIdgRLoqCMtXsePmZolJ5Z/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1z74HONHLjhbTdzKqL4wNJ0kVao4I7a4t",
+   "Etiqueta (Nombre)": "Lluvia_Ideas_Samuel_Felipe_Rodríguez_Velásquez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV",
+   "URL Drive": "https://drive.google.com/file/d/1z74HONHLjhbTdzKqL4wNJ0kVao4I7a4t/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1GRx9TxVLQxBJZCLz2bavZ6e4b2v0hFMw",
+   "Etiqueta (Nombre)": "Taller_Tres_Samuel_Felipe_Rodríguez_Velásquez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1P-iCHUR4422AHQYgT_oOmLGFpPzKlmFV",
+   "URL Drive": "https://drive.google.com/file/d/1GRx9TxVLQxBJZCLz2bavZ6e4b2v0hFMw/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "14_tTnOD4Docauot5nXMsj3yCGyK8-5gq",
+   "Etiqueta (Nombre)": "2025_1",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "15yqC2o-J1zclcYk26NfUn0A6BEAfPkLI",
+   "URL Drive": "https://drive.google.com/drive/folders/14_tTnOD4Docauot5nXMsj3yCGyK8-5gq"
+},
+ {
+   "ID Nodo": "16r_Ecsd_kL8pf2t0wvR35YjsGZq-aHHJ",
+   "Etiqueta (Nombre)": "Indagación1_Rodríguez_Samuel_Transformación_Textil.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14_tTnOD4Docauot5nXMsj3yCGyK8-5gq",
+   "URL Drive": "https://drive.google.com/file/d/16r_Ecsd_kL8pf2t0wvR35YjsGZq-aHHJ/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1arcPMvEuqnRvDf1TN5QsAyfdrpwP2OPW",
+   "Etiqueta (Nombre)": "Taller2_Rodríguez_Samuel.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14_tTnOD4Docauot5nXMsj3yCGyK8-5gq",
+   "URL Drive": "https://drive.google.com/file/d/1arcPMvEuqnRvDf1TN5QsAyfdrpwP2OPW/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1lKMyv4GQnLgiJ2It4NnxsxsHiqfmiQEn",
+   "Etiqueta (Nombre)": "Rodríguez_Samuel-ÁrbolP..pdf.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14_tTnOD4Docauot5nXMsj3yCGyK8-5gq",
+   "URL Drive": "https://drive.google.com/file/d/1lKMyv4GQnLgiJ2It4NnxsxsHiqfmiQEn/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1x9ayAGtd9qe4X8lJ7k_72wGIGKAOf6vt",
+   "Etiqueta (Nombre)": "Rodríguez_Samuel-ÁrbolO..pdf.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14_tTnOD4Docauot5nXMsj3yCGyK8-5gq",
+   "URL Drive": "https://drive.google.com/file/d/1x9ayAGtd9qe4X8lJ7k_72wGIGKAOf6vt/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1kjKjfeMRRia4f6N55xtYS6DGtEOke8Yc",
+   "Etiqueta (Nombre)": "Rodríguez_Samuel_Repositorios.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14_tTnOD4Docauot5nXMsj3yCGyK8-5gq",
+   "URL Drive": "https://drive.google.com/file/d/1kjKjfeMRRia4f6N55xtYS6DGtEOke8Yc/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1n6uM7jubbddMWA2uqLipveifG5NT-JMs",
+   "Etiqueta (Nombre)": "2026_1",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "15yqC2o-J1zclcYk26NfUn0A6BEAfPkLI",
+   "URL Drive": "https://drive.google.com/drive/folders/1n6uM7jubbddMWA2uqLipveifG5NT-JMs"
+},
+ {
+   "ID Nodo": "1SM0gH-yMF6JK6TkhcKKrpiYiNbwstSbr",
+   "Etiqueta (Nombre)": "V4-¡Nueva Denim!_Rodríguez_Samuel.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1n6uM7jubbddMWA2uqLipveifG5NT-JMs",
+   "URL Drive": "https://drive.google.com/file/d/1SM0gH-yMF6JK6TkhcKKrpiYiNbwstSbr/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "Etiqueta (Nombre)": "4_Recursos_Externos",
+   "Tipo": { "Nivel": "Carpeta Principal" },
+   "Conecta Con (Padre)": "nucleo",
+   "URL Drive": "https://drive.google.com/drive/folders/1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC"
+},
+ {
+   "ID Nodo": "1sc0MLPW859T_3YdxmhPSIKZ0KcLMKZSc",
+   "Etiqueta (Nombre)": "64.png",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/file/d/1sc0MLPW859T_3YdxmhPSIKZ0KcLMKZSc/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1LzqvOCMn2ZgfaPfqQVAfRh-3iYnHNb5R",
+   "Etiqueta (Nombre)": "63.png",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/file/d/1LzqvOCMn2ZgfaPfqQVAfRh-3iYnHNb5R/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1q8CrsENtC-dQXRgprUVJ6m30Vmu4XUbJ",
+   "Etiqueta (Nombre)": "62.png",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/file/d/1q8CrsENtC-dQXRgprUVJ6m30Vmu4XUbJ/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1uIuL_kdYXamj4HWlXtG1HVopYOAwwhCt",
+   "Etiqueta (Nombre)": "61.png",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/file/d/1uIuL_kdYXamj4HWlXtG1HVopYOAwwhCt/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1xJjdjqXZ-HXJeGFkBvbpZ6zkOK3GzA23",
+   "Etiqueta (Nombre)": "60.png",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/file/d/1xJjdjqXZ-HXJeGFkBvbpZ6zkOK3GzA23/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Ya07Su1fcuqTxHE-ABSAhktGWPz1H8YY",
+   "Etiqueta (Nombre)": "59.png",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/file/d/1Ya07Su1fcuqTxHE-ABSAhktGWPz1H8YY/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "Etiqueta (Nombre)": "Tipografía",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW"
+},
+ {
+   "ID Nodo": "1qSOeiSf5c659wMV4R7VkVIRc20MPoFnb",
+   "Etiqueta (Nombre)": "pdfcoffee.com_pensar-con-tipos-by-ellen-lupton.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "URL Drive": "https://drive.google.com/file/d/1qSOeiSf5c659wMV4R7VkVIRc20MPoFnb/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1r3O14Mh7jlQ2s5ynBEffSYP0D7JYqqwo",
+   "Etiqueta (Nombre)": "Diseño tipográfico_La tipografía más allá de la forma_Eduardo Pepe.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "URL Drive": "https://drive.google.com/file/d/1r3O14Mh7jlQ2s5ynBEffSYP0D7JYqqwo/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Txi73O9pD_XZqwHeXJVXSe9sUzZ_k_fv",
+   "Etiqueta (Nombre)": "pdfcoffee.com_the-elements-of-typographic-style-robert-bringhurst.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "URL Drive": "https://drive.google.com/file/d/1Txi73O9pD_XZqwHeXJVXSe9sUzZ_k_fv/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "130SCieKfS9qi84KR4UbcIRRVNTmlclK4",
+   "Etiqueta (Nombre)": "Logotipos de moda. Los códigos estéticos de las tipografías didonas en el fashion branding.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "URL Drive": "https://drive.google.com/file/d/130SCieKfS9qi84KR4UbcIRRVNTmlclK4/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1bEyKXcjl92hbmj_w9wfXuhN8n3I7Q-vd",
+   "Etiqueta (Nombre)": "Dialnet-La tipografía como generadora de identidad en la imagen de marca de países europeos en el s.XXI.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "URL Drive": "https://drive.google.com/file/d/1bEyKXcjl92hbmj_w9wfXuhN8n3I7Q-vd/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1rrj4xtDWuF5vLyfzQsoIPPGB4ZMuxJeN",
+   "Etiqueta (Nombre)": "pdfcoffee.com_kinross-robin-tipografia-moderna.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "URL Drive": "https://drive.google.com/file/d/1rrj4xtDWuF5vLyfzQsoIPPGB4ZMuxJeN/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1xlDEtwb3LD5a0t6X1RbIG2alvgTbCVGC",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_AXELBACKLUND_BAINFINEARTS_FASHIONDESIGNDEGREEWORK_16.03.2018.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1IpFbCru0epzB1_aMuMj-KnslT7tsdEXW",
+   "URL Drive": "https://drive.google.com/file/d/1xlDEtwb3LD5a0t6X1RbIG2alvgTbCVGC/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "Etiqueta (Nombre)": "Diseño",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt"
+},
+ {
+   "ID Nodo": "18gbYLRcrTS_DtrGtqibMcFKPq-zdV2Xw",
+   "Etiqueta (Nombre)": "Design Methodologies Guide Methodologies and methods for industrial design projects.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/18gbYLRcrTS_DtrGtqibMcFKPq-zdV2Xw/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "197nisd4rLK0mcer1etjjbtAAcV5TWrtz",
+   "Etiqueta (Nombre)": "The Language of Graphic Design_ An Illustrated Handbook for Understanding Fundamental Design Principles ( PDFDrive )_compressed.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/197nisd4rLK0mcer1etjjbtAAcV5TWrtz/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1tYQ8l5ZV5Khmmshf1R5Zds6kii-dcwZR",
+   "Etiqueta (Nombre)": "pdfcoffee.com_the-fundamentals-of-fashion-design-pdf-free.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1tYQ8l5ZV5Khmmshf1R5Zds6kii-dcwZR/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1kUklcB_3UiAVKjd7STY2MP5Mp1R0P72r",
+   "Etiqueta (Nombre)": "pdfcoffee.com_fashion-design-essentials-pdf-free.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1kUklcB_3UiAVKjd7STY2MP5Mp1R0P72r/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1U_sSBn7BAxIaqdgOcoX3veIkXLdvBS4E",
+   "Etiqueta (Nombre)": "Patternmaking for Fashion Design Helen Joseph-Armstrong.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1U_sSBn7BAxIaqdgOcoX3veIkXLdvBS4E/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1A9RxXY4SrGKd-ul2-iVTNZnB0G4cMC2a",
+   "Etiqueta (Nombre)": "pdfcoffee.com_universal-principles-of-design-william-lidwell-2nd-edition-january-2010-pdf-free.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1A9RxXY4SrGKd-ul2-iVTNZnB0G4cMC2a/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1C8aRfUEKP_jAq73y65m02nm5MC9FOLf_",
+   "Etiqueta (Nombre)": "pdfcoffee.com_historia-del-diseno-grafico-libro-phillips-b-meggs-5-pdf-free.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1C8aRfUEKP_jAq73y65m02nm5MC9FOLf_/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "16-SEczGhP6O34xfjRhnd7O2_PyBypk2t",
+   "Etiqueta (Nombre)": "pdfcoffee.com_diseño-y-comunicacion-visual-pdf-free.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/16-SEczGhP6O34xfjRhnd7O2_PyBypk2t/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1g2VzcLkyXuqdIwduluvH3cRIHe49tZMv",
+   "Etiqueta (Nombre)": "dokumen.pub_the-design-of-everyday-things-9780465050659-9780465003945-2013024417.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1g2VzcLkyXuqdIwduluvH3cRIHe49tZMv/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Mw2cTcN7O6frseSPcVkwwMclAiA9UbKt",
+   "Etiqueta (Nombre)": "dokumen.pub_the-principles-and-processes-of-interactive-design-2940496110-9782940496112.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1Mw2cTcN7O6frseSPcVkwwMclAiA9UbKt/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Zm1xgBPOSna1sPpWaPYY6LH0jDAQlerR",
+   "Etiqueta (Nombre)": "pdfcoffee.com_el-diseno-como-storytelling-pdf-free.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1Zm1xgBPOSna1sPpWaPYY6LH0jDAQlerR/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1ytrPSmt2YHLwpdvtH5mzOFUHF-0hhoBd",
+   "Etiqueta (Nombre)": "Factores de diseño en el desuso prematuro de prendas de vestir_un enfoque desde las etapas de vida del producto_Daniela Ordóñez-Suárez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14Ue_HnejC6QC4UveRhnsQYLPT2SDKGQt",
+   "URL Drive": "https://drive.google.com/file/d/1ytrPSmt2YHLwpdvtH5mzOFUHF-0hhoBd/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR",
+   "Etiqueta (Nombre)": "Sonido",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR"
+},
+ {
+   "ID Nodo": "1qfcsfwrUbb8ZKJDSlsgurhuJd-nXheb2",
+   "Etiqueta (Nombre)": "dokumen.pub_energy-flash-a-journey-through-rave-music-and-dance-culture-9781593764777-1593764774.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR",
+   "URL Drive": "https://drive.google.com/file/d/1qfcsfwrUbb8ZKJDSlsgurhuJd-nXheb2/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "137tmWLicJjSv6IblgeKY1DU_WR6ww7wx",
+   "Etiqueta (Nombre)": "dokumen.pub_audio-branding-using-sound-to-build-your-brand-0749478578-9780749478575.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR",
+   "URL Drive": "https://drive.google.com/file/d/137tmWLicJjSv6IblgeKY1DU_WR6ww7wx/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "11ACU7w5WeoI75yr0Qg4f_UE4P7X3mwvl",
+   "Etiqueta (Nombre)": "Ficción sonora y creatividad verbodependiente. Microrrelatos sonoros sin palabras.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR",
+   "URL Drive": "https://drive.google.com/file/d/11ACU7w5WeoI75yr0Qg4f_UE4P7X3mwvl/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1deDX1wt7GgWozmUp89odGQUKCqQtrzlg",
+   "Etiqueta (Nombre)": "Diseño sonoro y producción de sentido_La significación de los sonidos en los lenguajes audiovisuales.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR",
+   "URL Drive": "https://drive.google.com/file/d/1deDX1wt7GgWozmUp89odGQUKCqQtrzlg/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "18HVLeZ6QGhguQCDH-g7W76y1OMcfNSPN",
+   "Etiqueta (Nombre)": "Capturing-sound-how-technology-has-changed-music.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR",
+   "URL Drive": "https://drive.google.com/file/d/18HVLeZ6QGhguQCDH-g7W76y1OMcfNSPN/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1AscA0-TJTfUVXACVNQZUB-VoW-u1k7qy",
+   "Etiqueta (Nombre)": "pdfcoffee.com_russolo-luigi-the-art-of-noises-pdf-pdf-free.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1gXZauQgU5nA5p4vHDmiCHzwguLLt30tR",
+   "URL Drive": "https://drive.google.com/file/d/1AscA0-TJTfUVXACVNQZUB-VoW-u1k7qy/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "Etiqueta (Nombre)": "Moda_Streetwear",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-"
+},
+ {
+   "ID Nodo": "1mijDJohKBQJxuvSJOw4UbWYDz04DyhUG",
+   "Etiqueta (Nombre)": "El ritmo de la resistencia la evolución y el impacto del Hip-hop.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "URL Drive": "https://drive.google.com/file/d/1mijDJohKBQJxuvSJOw4UbWYDz04DyhUG/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1hNUERMRVz96I5ijR7d7dzph7bS4u1xtE",
+   "Etiqueta (Nombre)": "streetwear-the-new-exclusivity.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "URL Drive": "https://drive.google.com/file/d/1hNUERMRVz96I5ijR7d7dzph7bS4u1xtE/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "13V0ABM12XJwiITRu6CP9brnhSro2DlQr",
+   "Etiqueta (Nombre)": "Generacion Hip-Hop.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "URL Drive": "https://drive.google.com/file/d/13V0ABM12XJwiITRu6CP9brnhSro2DlQr/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1open2f5ZFHsn_OaD2tapHxuTt3_OSYrz2R", // Corregido ID duplicado leve internamente
+   "ID Nodo Real": "1Tn2f5ZFHsn_OaD2tapHxuTt3_OSYrz2R",
+   "Etiqueta (Nombre)": "SUBCULTURE THE MEANING OF STYLE.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "URL Drive": "https://drive.google.com/file/d/1Tn2f5ZFHsn_OaD2tapHxuTt3_OSYrz2R/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1xN5wFlJ3Vna4VQFbP4xH7X6wpmQqjAk_",
+   "Etiqueta (Nombre)": "Undergraduate Student Perceptions of the Origins of Streetwear Fashion An Exploratory Study.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "URL Drive": "https://drive.google.com/file/d/1xN5wFlJ3Vna4VQFbP4xH7X6wpmQqjAk_/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1SVR4aA-wSefpF1XvAEZ_TUfMudr4qdHn",
+   "Etiqueta (Nombre)": "A DISCUSSION OF STREETWEAR FASHION AS A CULT A QUALITATIVE APPROACH.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "URL Drive": "https://drive.google.com/file/d/1SVR4aA-wSefpF1XvAEZ_TUfMudr4qdHn/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Bx0yW9Li62wDbS5InA5vdTCE8K9GT48L",
+   "Etiqueta (Nombre)": "dokumen.pub_street-style-an-ethnography-of-fashion-blogging-9780857857217-9780857855756-9781474262910-9781474262897.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "117YCPviqh48VQmlLHVlO7j1jPJH8Cl6-",
+   "URL Drive": "https://drive.google.com/file/d/1Bx0yW9Li62wDbS5InA5vdTCE8K9GT48L/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "Etiqueta (Nombre)": "Denim",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c"
+},
+ {
+   "ID Nodo": "11Il9pSAt3-NpM3vilPI_cKE2wlXvEqK8",
+   "Etiqueta (Nombre)": "anthropology_in_blue_jeans_Daniel_Miller.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "URL Drive": "https://drive.google.com/file/d/11Il9pSAt3-NpM3vilPI_cKE2wlXvEqK8/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1vvGuU-1LqzMwpVLk8teSbHPwtkfGWXB6",
+   "Etiqueta (Nombre)": "un-siglo-de-denim.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "URL Drive": "https://drive.google.com/file/d/1vvGuU-1LqzMwpVLk8teSbHPwtkfGWXB6/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Ge-V_yoSPA9ZOhGEU9nfsVJLkff-OkfH",
+   "Etiqueta (Nombre)": "La sostenibilidad en el sistema de producción del denim..pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "URL Drive": "https://drive.google.com/file/d/1Ge-V_yoSPA9ZOhGEU9nfsVJLkff-OkfH/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1TQwlbsYuIBrniWOq_H01BLQvj9F6Slqg",
+   "Etiqueta (Nombre)": "El+impacto+ambiental+que+genera+el+proceso+del+Denim.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "URL Drive": "https://drive.google.com/file/d/1TQwlbsYuIBrniWOq_H01BLQvj9F6Slqg/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1QPf0YQk9w1zWhr5ZMZqcipvg0xGNES5g",
+   "Etiqueta (Nombre)": "Dialnet-IntervencionesAlSistemaDelDenimATravesDeLaLenteDelDiseño-9189497.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "URL Drive": "https://drive.google.com/file/d/1QPf0YQk9w1zWhr5ZMZqcipvg0xGNES5g/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1-7lHXiHtv5wJDh_snbit6bE4soXXVPC6",
+   "Etiqueta (Nombre)": "CriticalReviewonSustainabilityinDenimASteptowardSustainableProductionandConsumptionofDenim.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "URL Drive": "https://drive.google.com/file/d/1-7lHXiHtv5wJDh_snbit6bE4soXXVPC6/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1iZRVA1LOI3aZ2Q_aM7RQTkmrVVHqf_g_",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_MERCADEOSOCIALBOGOTÁ_SECTORTEXTILJEANS.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1GzTGZcO5SbKv5No6IAn3SMBfk9IfZq1c",
+   "URL Drive": "https://drive.google.com/file/d/1iZRVA1LOI3aZ2Q_aM7RQTkmrVVHqf_g_"
+},
+ {
+   "ID Nodo": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "Etiqueta (Nombre)": "Desperdicio",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/1XW49peOYsJjlf8e78S7PB-N4n6wDEs01"
+},
+ {
+   "ID Nodo": "1Szr3Ui81ZKIcZm62qsB-3a0S8xjakj0d",
+   "Etiqueta (Nombre)": "ZEROWASTEFASHIONDESIGN_TIMORISANEN_HOLLYMCQUILLAN_BOOK.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1Szr3Ui81ZKIcZm62qsB-3a0S8xjakj0d/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1FQPppB09KdDX-vcRPz2VKdKIOZs4rsG_",
+   "Etiqueta (Nombre)": "ZERO WASTE_HOLLY MCQUILLAN_STUDY.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1FQPppB09KdDX-vcRPz2VKdKIOZs4rsG_/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1RL2BrVFMTrzYylZiYGNlEx71mVF59Cyg",
+   "Etiqueta (Nombre)": "A New Textiles Economy - Redesigning fashions future_Ellen MacArthur Foundation.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1RL2BrVFMTrzYylZiYGNlEx71mVF59Cyg/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1hpzYs_NzKsADR8RB8c1zGr-tjuzDhkzy",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_MODREBEL_SOSTENIBILIDAD_MODA CIRCULAR.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1hpzYs_NzKsADR8RB8c1zGr-tjuzDhkzy/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1L8cX0ICJggqqgSfxyUyP0pC7oMp2bt9I",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_TREE CLOTHING_MODA CIRCULAR.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1L8cX0ICJggqqgSfxyUyP0pC7oMp2bt9I/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1JmuiJoj6oEnEQwCLyqJ3RiOU8fz3y3kr",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_MODASOSTENIBLE_DANIELADUQUE.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1JmuiJoj6oEnEQwCLyqJ3RiOU8fz3y3kr/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1xcl8Sg7UXOTdfFGYuGm5mbokASwmgR-Q",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_JUANITASALGADOESLAVA_TOTALUSE.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1xcl8Sg7UXOTdfFGYuGm5mbokASwmgR-Q/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1uo8ZA6JEAictBBIAbBTmhnOdrZv-9-VK",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_PONTIFICIAUNIVERSIDADJAVERIANA_ENLACE.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1uo8ZA6JEAictBBIAbBTmhnOdrZv-9-VK/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1D5rRLJhUEhr3GKkR5tk8XKCW_8U0X22i",
+   "Etiqueta (Nombre)": "EL RETO DE LA SOSTENIBILIDAD EN LA INDUSTRIA TEXTIL Y DE LA MODA_ROSA PATRICIA LARIOS.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1XW49peOYsJjlf8e78S7PB-N4n6wDEs01",
+   "URL Drive": "https://drive.google.com/file/d/1D5rRLJhUEhr3GKkR5tk8XKCW_8U0X22i/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1HbUgQBE4eB8UaSaFhbd-V3ss1m2djKUT",
+   "Etiqueta (Nombre)": "Recursos_Web",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/1HbUgQBE4eB8UaSaFhbd-V3ss1m2djKUT"
+},
+ {
+   "ID Nodo": "1o4KulcWji81ABq_risOKIql1efqTYCrMiv_tO--zIDw",
+   "Etiqueta (Nombre)": "Sitios_Web",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1HbUgQBE4eB8UaSaFhbd-V3ss1m2djKUT",
+   "URL Drive": "https://docs.google.com/document/d/1o4KulcWji81ABq_risOKIql1efqTYCrMiv_tO--zIDw/edit?usp=drivesdk"
+},
+ {
+   "ID Nodo": "17g709wT1oqRQsfjULjBEEZ_-TUNG570nZDm57a0FpFw",
+   "Etiqueta (Nombre)": "Métodos de Diseño Delft",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1HbUgQBE4eB8UaSaFhbd-V3ss1m2djKUT",
+   "URL Drive": "https://docs.google.com/document/d/17g709wT1oqRQsfjULjBEEZ_-TUNG570nZDm57a0FpFw/edit?usp=drivesdk"
+},
+ {
+   "ID Nodo": "14aUKtzmxN0o8zqno08SlbBnURet8LaFn",
+   "Etiqueta (Nombre)": "Originales_Transformados",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1HbUgQBE4eB8UaSaFhbd-V3ss1m2djKUT",
+   "URL Drive": "https://drive.google.com/drive/folders/14aUKtzmxN0o8zqno08SlbBnURet8LaFn"
+},
+ {
+   "ID Nodo": "1iM2DXU4cXlhjxmZlvzGgpaPCW-K8-n9AQLc7x9Sgdh4",
+   "Etiqueta (Nombre)": "FashionandCulturalIdentityRESEARCHPAPER",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "14aUKtzmxN0o8zqno08SlbBnURet8LaFn",
+   "URL Drive": "https://docs.google.com/document/d/1iM2DXU4cXlhjxmZlvzGgpaPCW-K8-n9AQLc7x9Sgdh4/edit?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI",
+   "Etiqueta (Nombre)": "Herramienta Interactiva",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI"
+},
+ {
+   "ID Nodo": "1IZEb_rFuEXLbECb1oQi-q2Ox_WiZqn3r",
+   "Etiqueta (Nombre)": "DESARROLLO DE UN ENTORNO VIRTUAL PARA LA IMPLEMENTACIÓN DE PUBLICIDAD INTERACTIVA_RV.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI",
+   "URL Drive": "https://drive.google.com/file/d/1IZEb_rFuEXLbECb1oQi-q2Ox_WiZqn3r/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Fg46toJwtKNGJ2wESeJQ4eklnvmU4nub",
+   "Etiqueta (Nombre)": "A Survey of Augmented Reality_Ronald T. Azuma.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI",
+   "URL Drive": "https://drive.google.com/file/d/1Fg46toJwtKNGJ2wESeJQ4eklnvmU4nub/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "10DQeIMbMVhTFZ6ergV_ysRcnNd-0GijC",
+   "Etiqueta (Nombre)": "Realidad Aumentada_Un Enfoque Práctico con ARToolKit y Blender.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI",
+   "URL Drive": "https://drive.google.com/file/d/10DQeIMbMVhTFZ6ergV_ysRcnNd-0GijC/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1wnaBbXiQ2m0iFmJRDfKU8TgUMOAROrjS",
+   "Etiqueta (Nombre)": "dokumen.pub_the-digital-media-handbook_Andrew Dewdney_Peter Ride.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI",
+   "URL Drive": "https://drive.google.com/file/d/1wnaBbXiQ2m0iFmJRDfKU8TgUMOAROrjS/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1PboXKUQ5CZZ-LHWJSxS90MSszB488udA",
+   "Etiqueta (Nombre)": "alan-cooper-robert-reimann-david-cronin-christopher-noessel_-the-essentials-of-interaction-design.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI",
+   "URL Drive": "https://drive.google.com/file/d/1PboXKUQ5CZZ-LHWJSxS90MSszB488udA/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1PKALRXmEOPDa1k71SxJjCS4Uoo02hRKC",
+   "Etiqueta (Nombre)": "Realidad Virtual y Realidad Aumentada_Javier Luque Ordóñez.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1qSdBP1t5GHoMuYPn6G_sT9CiXt3Sr8UI",
+   "URL Drive": "https://drive.google.com/file/d/1PKALRXmEOPDa1k71SxJjCS4Uoo02hRKC/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "Etiqueta (Nombre)": "Identidad",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc"
+},
+ {
+   "ID Nodo": "1lQ5Xl42ulP36P-g-E19MUEuxw_Ltmkup",
+   "Etiqueta (Nombre)": "Fashion and Cultural Identity_The Role of Fashion in Expressing.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "URL Drive": "https://drive.google.com/file/d/1lQ5Xl42ulP36P-g-E19MUEuxw_Ltmkup/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1OroxwNcSzgzMal5LqY2sK93I7GU1gAaO",
+   "Etiqueta (Nombre)": "Fashion is a Form of a Self-Expression_Atabi Mandal_Rajeev Kumar.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "URL Drive": "https://drive.google.com/file/d/1OroxwNcSzgzMal5LqY2sK93I7GU1gAaO/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Z91YgPRCAgEr7-X1s1wwVhOnrRRxbL9T",
+   "Etiqueta (Nombre)": "THEINFLUENCEOFFASHIONONIDENTITYANDAESTHETICS_ASOCIOCULTURALPERSPECTIVEWITHINTHEFRAMEWORKOFSUSTAINABLEDEVELOPMENTGOAL.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "URL Drive": "https://drive.google.com/file/d/1Z91YgPRCAgEr7-X1s1wwVhOnrRRxbL9T/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1RNVRqCzSpz9d5M5gogJP4vLvD1tTM6MZ",
+   "Etiqueta (Nombre)": "FashionDesignasaMeanstoRecognizeandBuildCommunitiesinPlace.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "URL Drive": "https://drive.google.com/file/d/1RNVRqCzSpz9d5M5gogJP4vLvD1tTM6MZ/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1ovbD7WQpSRI_vlflBu3YcUTCkut-DeB1",
+   "Etiqueta (Nombre)": "1_EXPLORING_HOW_INDIVIDUALS_USE_FASHION_AS_A_MEANS_OF_SELF_EXPRESSION_AND_IDENTITY_CONSTRUCTION.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "URL Drive": "https://drive.google.com/file/d/1ovbD7WQpSRI_vlflBu3YcUTCkut-DeB1/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1915TQPHrp9Cs5bm1A_PNGeMtvec9FFau",
+   "Etiqueta (Nombre)": "RawDenimasaMeansofCommunication_SelfExpressionandIdentity.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "URL Drive": "https://drive.google.com/file/d/1915TQPHrp9Cs5bm1A_PNGeMtvec9FFau/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1Pj2N8-Xpgdbk2rf2GOsjw8gROJv-K2ka",
+   "Etiqueta (Nombre)": "DOCUMENTOGRADO_IDENTITYEXPRESSIONTHROUGHSTREETWEAR_HOWGENZUSESTREETWEARASAFORMOFSELFEXPRESSIONANDIDENTITYCONSTRUCTION.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "1Xo_FuurgkR9r1Ag60wSDTWwF1r7VNyKc",
+   "URL Drive": "https://drive.google.com/file/d/1Pj2N8-Xpgdbk2rf2GOsjw8gROJv-K2ka/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "18sfzOGJiJ2JEEJkEni1Uubq505CfbtJy",
+   "Etiqueta (Nombre)": "Upcycling",
+   "Tipo": { "Nivel": "Subcarpeta" },
+   "Conecta Con (Padre)": "1ZoCzLaXuR7gFb1O7AVVOz1GKlGg-o0kC",
+   "URL Drive": "https://drive.google.com/drive/folders/18sfzOGJiJ2JEEJkEni1Uubq505CfbtJy"
+},
+ {
+   "ID Nodo": "1mklfjT7pzSCEOxBTpCPmG2dxLysb8fah",
+   "Etiqueta (Nombre)": "EL UPCYCLING Y SU MODELO DE NEGOCIO.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "18sfzOGJiJ2JEEJkEni1Uubq505CfbtJy",
+   "URL Drive": "https://drive.google.com/file/d/1mklfjT7pzSCEOxBTpCPmG2dxLysb8fah/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1BSmT3W6VLt3X4-9Xo6dlGNg8Fgmve8LT",
+   "Etiqueta (Nombre)": "Upcycling como alternativa estética, simbólica y funcional en el diseño de moda circular.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "18sfzOGJiJ2JEEJkEni1Uubq505CfbtJy",
+   "URL Drive": "https://drive.google.com/file/d/1BSmT3W6VLt3X4-9Xo6dlGNg8Fgmve8LT/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1y5c7FRH61corPOGe_cUK3wluH7gBADjn",
+   "Etiqueta (Nombre)": "Dialnet-El arte del vestir Utilizando el Upcycling como constructor de la identidad y de espacios creativos compartidos en el diseño de indumentaria sostenible.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "18sfzOGJiJ2JEEJkEni1Uubq505CfbtJy",
+   "URL Drive": "https://drive.google.com/file/d/1y5c7FRH61corPOGe_cUK3wluH7gBADjn/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1QLfCDG4RukziWc-lYnFR7n5utemCRLDd",
+   "Etiqueta (Nombre)": "Dialnet-Upcycling y soberanía textil_metodologías de investigación y prácticas contemporáneas.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "18sfzOGJiJ2JEEJkEni1Uubq505CfbtJy",
+   "URL Drive": "https://drive.google.com/file/d/1QLfCDG4RukziWc-lYnFR7n5utemCRLDd/view?usp=drivesdk"
+},
+ {
+   "ID Nodo": "1xuLRY_AL_sfe849gIERSWT3jV4lAaQA2",
+   "Etiqueta (Nombre)": "Expression Method and Technique of Upcycling Design in Contemporary Fashion Design.pdf",
+   "Tipo": { "Nivel": "Archivo" },
+   "Conecta Con (Padre)": "18sfzOGJiJ2JEEJkEni1Uubq505CfbtJy",
+   "URL Drive": "https://drive.google.com/file/d/1xuLRY_AL_sfe849gIERSWT3jV4lAaQA2/view?usp=drivesdk"
+}
+    ];
+    // ========================================================
+
+    const nodosArray = [];
+    const enlacesArray = [];
+
+    // Nodo Fijo Central (Núcleo)
+    nodosArray.push({
+      id: 'nucleo',
+      label: 'NÚCLEO CENTRAL',
+      size: 38,
+      color: { background: '#ffffff', border: '#3b82f6' },
+      font: { color: '#ffffff', size: 15, bold: true, face: 'Outfit' }
+    });
+
+    // Mapeo dinámico y asignación de estilos según jerarquías
+    datosRaw.forEach(item => {
+      let tamano = 10;
+      let colorNodo = '#475569'; // Gris para Archivos
+      let colorTexto = '#94a3b8';
+
+      // Validación segura del tipo/nivel estructurado del JSON
+      const nivel = item["Tipo"] ? item["Tipo"]["Nivel"] : "Archivo";
+
+      if (nivel === "Carpeta Principal") {
+        tamano = 24;
+        colorNodo = '#3b82f6'; // Azul brillante
+        colorTexto = '#f8fafc';
+      } else if (nivel === "Subcarpeta") {
+        tamano = 18;
+        colorNodo = '#818cf8'; // Morado
+        colorTexto = '#e2e8f0';
+      }
+
+      nodosArray.push({
+        id: item["ID Nodo"],
+        label: item["Etiqueta (Nombre)"],
+        size: tamano,
+        url: item["URL Drive"],
+        color: { background: colorNodo, border: '#0b0f19' },
+        font: { color: colorTexto, size: tamano > 10 ? 12 : 9, face: 'Outfit' }
+      });
+
+      if (item["Conecta Con (Padre)"]) {
+        enlacesArray.push({
+          from: item["ID Nodo"],
+          to: item["Conecta Con (Padre)"]
+        });
+      }
+    });
+
+    // Conjuntos maestros de datos (Estructura base)
+    const nodosMaestros = new vis.DataSet(nodosArray);
+    const enlacesMaestros = new vis.DataSet(enlacesArray);
+
+    // Vista filtrada interactiva conectada a los Checkboxes de tu HTML
+    const nodosFiltrados = new vis.DataView(nodosMaestros, {
+      filter: function (node) {
+        if (node.id === 'nucleo') return true; // El núcleo nunca se oculta
+        
+        // Verificamos si los elementos existen en la interfaz antes de leer su estado
+        const verCarpetas = document.getElementById('chk-carpetas') ? document.getElementById('chk-carpetas').checked : true;
+        const verSubcarpetas = document.getElementById('chk-subcarpetas') ? document.getElementById('chk-subcarpetas').checked : true;
+        const verArchivos = document.getElementById('chk-archivos') ? document.getElementById('chk-archivos').checked : true;
+
+        if (node.size === 24) return verCarpetas;
+        if (node.size === 18) return verSubcarpetas;
+        if (node.size === 10) return verArchivos;
+        
+        return true;
+      }
+    });
+
+    const container = document.getElementById('network-container');
+    const data = { 
+      nodes: nodosFiltrados, 
+      edges: enlacesMaestros 
+    };
+
+    // Ajustes físicos calibrados para tu volumen real de nodos (+80 elementos)
+    const options = {
+      nodes: {
+        shape: 'dot',
+        font: { vadjust: 26, face: 'Outfit' }
+      },
+      edges: {
+        color: { color: 'rgba(255, 255, 255, 0.1)', highlight: '#3b82f6' },
+        width: 1.2,
+        smooth: false
+      },
+      physics: {
+        barnesHut: {
+          gravitationalConstant: -5500, // Evita aglomeración de textos pesados
+          centralGravity: 0.15,
+          springLength: 120,
+          springConstant: 0.04
+        },
+        stabilization: {
+          iterations: 150 // Pre-renderizado suave al arrancar la pantalla
+        }
+      },
+      interaction: { hover: true, zoomView: true, dragView: true }
+    };
+
+    const network = new vis.Network(container, data, options);
+
+    // Función global que se activa al cambiar los estados de los filtros
+    function filtrarMapa() {
+      nodosFiltrados.refresh();
+    }
+
+    // Evento Click: Abre la URL de Google Drive correspondiente en pestaña nueva
+    network.on("click", function (params) {
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+        const nodeData = nodosMaestros.get(nodeId);
+        
+        if (nodeData && nodeData.url && nodeData.url !== "#") {
+          window.open(nodeData.url, '_blank');
+        }
+      }
+    });
+
+    // Control del indicador animado de la rueda del ratón (hint)
+    const hintOverlay = document.getElementById('hint');
+    function hideHint() {
+      if (hintOverlay && !hintOverlay.classList.contains('hidden')) {
+        hintOverlay.classList.add('hidden');
+      }
+    }
+    setTimeout(hideHint, 5000); // Desvanecer en 5 segundos
+
+    // Ocultar si el usuario empieza a interactuar
+    network.on("dragStart", hideHint);
+    network.on("zoom", hideHint);
+    network.on("click", hideHint);
+  </script>
+</body>
+</html>

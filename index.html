@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Infografía Viva</title>
+    <title>Dashboard Interactivo</title>
     <link rel="stylesheet" href="style.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -16,86 +16,150 @@
 
 <body>
     <div id="app">
-        <!-- Floating Header -->
-        <header class="glass-panel header">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-panel">
             <div class="logo-container">
                 <i data-lucide="sparkles" class="icon-accent"></i>
-                <h1>Explorador Interactivo</h1>
+                <div>
+                    <h1>Explorador</h1>
+                    <p class="subtitle">Tracegarms</p>
+                </div>
             </div>
-            <p class="subtitle">Navega libremente por la infografía</p>
-            <div class="header-buttons mt-3">
-                <button id="open-videos" class="btn-text">
-                    <i data-lucide="play-circle"></i> Ver Videos del Proyecto
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-target="section-infografia">
+                    <i data-lucide="map"></i>
+                    <span>Infografía</span>
                 </button>
-                <button id="open-pdf" class="btn-text">
-                    <i data-lucide="file-text"></i> Presentacion
+                <button class="nav-item" data-target="section-pdf">
+                    <i data-lucide="file-text"></i>
+                    <span>Presentación</span>
                 </button>
+                <button class="nav-item" data-target="section-videos">
+                    <i data-lucide="play-circle"></i>
+                    <span>Videos Explicativos</span>
+                </button>
+                <button class="nav-item" data-target="section-metodologia">
+                    <i data-lucide="git-merge"></i>
+                    <span>Metodología</span>
+                </button>
+                <button class="nav-item" data-target="section-bitacora">
+                    <i data-lucide="book"></i>
+                    <span>Bitácora</span>
+                </button>
+                <button class="nav-item" data-target="section-marco">
+                    <i data-lucide="layout-template"></i>
+                    <span>Marco Conceptual</span>
+                </button>
+                <a href="https://canva.link/ctey2pz48lbrxcn" target="_blank" class="nav-item nav-external-link">
+                    <i data-lucide="external-link"></i>
+                    <span>Presentación Canva</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="https://canva.link/ctey2pz48lbrxcn" target="_blank" class="btn-canva sidebar-btn">
+                    <i data-lucide="external-link"></i>
+                    <span>Presentación Canva</span>
+                </a>
             </div>
-        </header>
+        </aside>
 
-        <!-- Main Infographic Container -->
-        <main class="viewport">
-            <div id="panzoom-container">
-                <img src="Infografia.png" alt="Infografía Completa" id="infographic" />
-            </div>
+        <!-- Main Content Panel -->
+        <main class="main-content">
+            <!-- 1. Infografía Section -->
+            <section id="section-infografia" class="content-section active full-bleed">
+                <div class="viewport">
+                    <div id="panzoom-container">
+                        <img src="Infografia.png" alt="Infografía Completa" id="infographic" />
+                    </div>
+                </div>
+                <!-- Panzoom Controls inside infographic -->
+                <div class="glass-panel controls">
+                    <button id="zoom-in" class="btn" title="Acercar">
+                        <i data-lucide="zoom-in"></i>
+                    </button>
+                    <button id="reset" class="btn" title="Restablecer">
+                        <i data-lucide="maximize"></i>
+                    </button>
+                    <button id="zoom-out" class="btn" title="Alejar">
+                        <i data-lucide="zoom-out"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 2. PDF Presentation Section -->
+            <section id="section-pdf" class="content-section">
+                <div class="section-header">
+                    <h2>Presentación (Pitch)</h2>
+                    <p>Visualiza el documento de presentación del proyecto.</p>
+                </div>
+                <div class="pdf-wrapper">
+                    <iframe src="Pitch.pdf" title="Presentación Pitch"></iframe>
+                </div>
+            </section>
+
+            <!-- 3. Videos Section -->
+            <section id="section-videos" class="content-section">
+                <div class="section-header">
+                    <h2>Videos del Proyecto</h2>
+                    <p>Explicación detallada del proyecto y sus componentes.</p>
+                </div>
+                <div class="video-grid">
+                    <div class="video-wrapper">
+                        <video controls>
+                            <source src="video_01.mp4" type="video/mp4">
+                            Tu navegador no soporta reproducción de video.
+                        </video>
+                    </div>
+                    <div class="video-wrapper">
+                        <video controls>
+                            <source src="video_02.mp4" type="video/mp4">
+                            Tu navegador no soporta reproducción de video.
+                        </video>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. Metodologia Section -->
+            <section id="section-metodologia" class="content-section">
+                <div class="section-header">
+                    <h2>Metodología</h2>
+                    <p>Integración de procesos metodológicos del proyecto.</p>
+                </div>
+                <div class="iframe-wrapper">
+                    <iframe src="https://sfeliperodriguez.github.io/metodologia" title="Metodología"></iframe>
+                </div>
+            </section>
+
+            <!-- 5. Bitacora Section -->
+            <section id="section-bitacora" class="content-section">
+                <div class="section-header">
+                    <h2>Bitácora</h2>
+                    <p>Registro de actividades, avances y notas del proyecto.</p>
+                </div>
+                <div class="iframe-wrapper">
+                    <iframe src="index-bitacora.html" title="Bitácora"></iframe>
+                </div>
+            </section>
+
+            <!-- 6. Marco Conceptual Section -->
+            <section id="section-marco" class="content-section">
+                <div class="section-header">
+                    <h2>Marco Conceptual</h2>
+                    <p>Estructura teórica y referencias conceptuales.</p>
+                </div>
+                <div class="iframe-wrapper">
+                    <iframe src="https://sfeliperodriguez.github.io/marco" title="Marco Conceptual"></iframe>
+                </div>
+            </section>
         </main>
 
-        <!-- Controls -->
-        <div class="glass-panel controls">
-            <button id="zoom-in" class="btn" title="Acercar">
-                <i data-lucide="zoom-in"></i>
-            </button>
-            <button id="reset" class="btn" title="Restablecer">
-                <i data-lucide="maximize"></i>
-            </button>
-            <button id="zoom-out" class="btn" title="Alejar">
-                <i data-lucide="zoom-out"></i>
-            </button>
-        </div>
-
-        <!-- Animated overlay hints -->
+        <!-- Animated overlay hints (only visible when infographic is active) -->
         <div class="hint-overlay" id="hint">
             <div class="mouse-icon">
                 <div class="wheel"></div>
             </div>
-            <span>Desplaza y usa la rueda para explorar</span>
-        </div>
-        <!-- Video Modal -->
-        <div id="video-modal" class="modal hidden">
-            <div class="modal-content glass-panel">
-                <button id="close-videos" class="btn-close">
-                    <i data-lucide="x"></i>
-                </button>
-                <h2>Acerca del Proyecto</h2>
-                <div class="video-grid">
-                    <!-- Video 1 -->
-                    <div class="video-wrapper">
-                        <video controls>
-                            <source src="video_01.mp4" type="video/mp4">
-                        </video>
-                    </div>
-                    <!-- Video 2 -->
-                    <div class="video-wrapper">
-                        <video controls>
-                            <source src="video_02.mp4" type="video/mp4">
-                        </video>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- PDF Modal -->
-        <div id="pdf-modal" class="modal hidden">
-            <div class="modal-content glass-panel pdf-modal-content">
-                <button id="close-pdf" class="btn-close">
-                    <i data-lucide="x"></i>
-                </button>
-                <h2>Presentación (Pitch)</h2>
-                <div class="pdf-wrapper">
-                    <!-- Asegúrate de que el archivo PDF se llame "pitch.pdf" o cambia esta ruta -->
-                    <iframe src="Pitch.pdf" title="Presentación Pitch"></iframe>
-                </div>
-            </div>
+            <span>Usa la rueda para explorar la infografía</span>
         </div>
     </div>
 
